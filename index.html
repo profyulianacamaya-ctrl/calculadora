@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Series de Tiempo — Promedio Móvil</title>
+<meta name="description" content="Calculadora de series de tiempo por el método de promedio móvil: índices estacionales, desestacionalización, tendencia y pronóstico.">
+<meta name="theme-color" content="#0f766e" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1220" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Series PM">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --text: #1b2430;
+    --muted: #5d6b7c;
+    --line: #dfe4ea;
+    --line-soft: #eef1f4;
+    --accent: #0f766e;
+    --accent-text: #ffffff;
+    --accent-soft: #e2f3f1;
+    --error: #c62828;
+    --error-soft: #fdecec;
+    --input-bg: #ffffff;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b1220;
+      --card: #121a2a;
+      --text: #e6ebf2;
+      --muted: #97a3b4;
+      --line: #263248;
+      --line-soft: #1a2436;
+      --accent: #2dd4bf;
+      --accent-text: #062a26;
+      --accent-soft: #123a37;
+      --error: #ff7b7b;
+      --error-soft: #3a1a1e;
+      --input-bg: #0e1625;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 0 16px; }
+  header { padding: 28px 0 8px; }
+  h1 { font-size: 1.35rem; line-height: 1.3; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+  h1 span { color: var(--accent); display: block; font-weight: 600; }
+  h2 { font-size: 1.05rem; margin: 0; font-weight: 650; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 16px;
+    margin: 16px 0;
+    box-shadow: var(--shadow);
+  }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+
+  /* Configuración */
+  .config { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+  .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .field label { font-size: .82rem; color: var(--muted); font-weight: 550; }
+  input, select, textarea {
+    font: inherit;
+    color: var(--text);
+    background: var(--input-bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    min-height: 44px;
+    padding: 8px 10px;
+    width: 100%;
+  }
+  select { appearance: none; -webkit-appearance: none; padding-right: 30px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 16px) 19px, calc(100% - 11px) 19px; background-size: 5px 5px; background-repeat: no-repeat; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+
+  /* Grilla de carga */
+  .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 10px; }
+  table { border-collapse: separate; border-spacing: 0; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+  thead th { font-size: .78rem; color: var(--muted); font-weight: 600; text-align: right; background: var(--card); vertical-align: bottom; white-space: normal; min-width: 64px; }
+  tbody tr:last-child td, tbody tr:last-child th { border-bottom: 0; }
+  th:first-child, td:first-child {
+    position: sticky; left: 0; z-index: 1; background: var(--card); text-align: left;
+    border-right: 1px solid var(--line);
+  }
+  thead th:first-child { z-index: 2; }
+  td.num { text-align: right; }
+  td.txt { text-align: left; }
+  tr.total td { font-weight: 650; border-top: 1px solid var(--line); }
+  .grid td { padding: 6px 3px; }
+  .grid td:first-child { font-weight: 600; padding: 6px 8px; }
+  .grid input { min-width: 52px; text-align: right; padding: 8px 6px; }
+  .grid thead th { text-align: center; min-width: 0; }
+  .grid input.err { border-color: var(--error); background: var(--error-soft); }
+
+  details { margin-top: 14px; }
+  summary { cursor: pointer; color: var(--accent); font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+  details textarea { min-height: 110px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .9rem; resize: vertical; }
+  .hint { font-size: .82rem; color: var(--muted); margin: 6px 0 10px; }
+
+  /* Botones */
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  button {
+    font: inherit; font-weight: 600; min-height: 44px; padding: 10px 18px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); flex: 1 1 100%; }
+  button.small { min-height: 40px; padding: 6px 14px; font-size: .88rem; }
+  .actions button:not(.primary) { flex: 1 1 0; }
+
+  .msg { display: none; margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: var(--error-soft); color: var(--error); font-size: .92rem; }
+  .msg.show { display: block; }
+
+  /* Resultados */
+  #resultados[hidden] { display: none; }
+  .eq { font-size: 1.15rem; font-weight: 600; margin: 4px 0 14px; padding: 12px 14px; background: var(--accent-soft); border-radius: 10px; overflow-wrap: anywhere; }
+  .nota { font-size: .8rem; color: var(--muted); margin: 10px 2px 0; }
+  .bar-csv { display: flex; justify-content: flex-end; }
+  .bar-csv button { flex: 1 1 100%; }
+
+  footer { text-align: right; color: var(--muted); font-size: .9rem; padding: 12px 0 28px; }
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); opacity: 0;
+    background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: .9rem;
+    transition: opacity .2s, transform .2s; pointer-events: none; z-index: 10;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (min-width: 640px) {
+    h1 { font-size: 1.6rem; }
+    h1 span { display: inline; }
+    .config { grid-template-columns: repeat(3, 1fr); }
+    .card { padding: 22px 22px; }
+    button.primary { flex: 0 0 auto; }
+    .actions button:not(.primary) { flex: 0 0 auto; }
+    .bar-csv button { flex: 0 0 auto; }
+  }
+  @media (min-width: 900px) {
+    .config { grid-template-columns: repeat(6, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Series de Tiempo — <span>Método de Promedio Móvil</span></h1>
+  </header>
+
+  <main>
+    <section class="card" aria-labelledby="t-datos">
+      <div class="card-head"><h2 id="t-datos">Datos</h2></div>
+      <div class="config">
+        <div class="field">
+          <label for="anios">Cantidad de años</label>
+          <input id="anios" type="number" inputmode="numeric" min="2" max="10" step="1" value="3">
+        </div>
+        <div class="field">
+          <label for="L">Períodos por año</label>
+          <select id="L">
+            <option value="2">2 · Semestral</option>
+            <option value="3">3 · Cuatrimestral</option>
+            <option value="4" selected>4 · Trimestral</option>
+            <option value="6">6 · Bimestral</option>
+            <option value="12">12 · Mensual</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="inicio">Año inicial</label>
+          <input id="inicio" type="number" inputmode="numeric" step="1" value="2022">
+        </div>
+        <div class="field">
+          <label for="horiz">Períodos a pronosticar</label>
+          <input id="horiz" type="number" inputmode="numeric" min="1" max="48" step="1" value="4">
+        </div>
+        <div class="field">
+          <label for="dec">Decimales</label>
+          <select id="dec">
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="sep">Separador decimal</label>
+          <select id="sep">
+            <option value="," selected>Coma (1,5)</option>
+            <option value=".">Punto (1.5)</option>
+          </select>
+        </div>
+      </div>
+
+      <p class="hint" style="margin-top:18px">Carga la serie por año (filas) y período (columnas). Se acepta coma o punto decimal.</p>
+      <div class="scroll"><table class="grid" id="grilla"></table></div>
+
+      <details id="pegar-box">
+        <summary>Pegar desde Excel</summary>
+        <p class="hint">Pega la tabla (separada por tabulaciones, punto y coma o espacios). Si la primera columna es el año, se ignora.</p>
+        <textarea id="pegar" placeholder="26	30	24	42&#10;28	38	27	44&#10;34	36	33	52" aria-label="Datos pegados"></textarea>
+        <div class="actions"><button type="button" id="btn-pegar" class="small">Llenar grilla</button></div>
+      </details>
+
+      <div class="msg" id="msg" role="alert" aria-live="assertive"></div>
+
+      <div class="actions">
+        <button type="button" class="primary" id="btn-calc">Calcular</button>
+        <button type="button" id="btn-ej">Cargar ejemplo</button>
+        <button type="button" id="btn-limpiar">Limpiar</button>
+      </div>
+    </section>
+
+    <div id="resultados" hidden>
+      <section class="card" aria-labelledby="t-princ">
+        <div class="card-head"><h2 id="t-princ">Tabla principal</h2><button type="button" class="small" data-copiar="principal">Copiar</button></div>
+        <div class="scroll" id="tab-principal"></div>
+        <p class="nota" id="nota-par" hidden>Con L par, las fluctuaciones y el promedio móvil quedan entre su fila y la siguiente; el móvil centrado ya está alineado con su período.</p>
+      </section>
+
+      <section class="card" aria-labelledby="t-ind">
+        <div class="card-head"><h2 id="t-ind">Corrección de los índices</h2><button type="button" class="small" data-copiar="indices">Copiar</button></div>
+        <div class="scroll" id="tab-indices"></div>
+        <div class="eq" id="factor" style="margin:14px 0 0"></div>
+      </section>
+
+      <section class="card" aria-labelledby="t-des">
+        <div class="card-head"><h2 id="t-des">Desestacionalización</h2><button type="button" class="small" data-copiar="desest">Copiar</button></div>
+        <div class="scroll" id="tab-desest"></div>
+      </section>
+
+      <section class="card" aria-labelledby="t-rec">
+        <div class="card-head"><h2 id="t-rec">Recta de tendencia</h2><button type="button" class="small" data-copiar="recta">Copiar</button></div>
+        <div class="eq" id="ecuacion"></div>
+        <div class="scroll" id="tab-recta"></div>
+      </section>
+
+      <section class="card" aria-labelledby="t-pron">
+        <div class="card-head"><h2 id="t-pron">Pronóstico</h2><button type="button" class="small" data-copiar="pronostico">Copiar</button></div>
+        <div class="scroll" id="tab-pronostico"></div>
+      </section>
+
+      <div class="bar-csv"><button type="button" id="btn-csv">Descargar CSV</button></div>
+    </div>
+  </main>
+
+  <footer>Prof. Neme Gastón</footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="calc.js"></script>
+<script>
+(function () {
+  "use strict";
+  const C = window.SerieCalc;
+  const $ = id => document.getElementById(id);
+  const CLAVE = "serie-pm-v1";
+  const EJEMPLO = { anios: 3, L: 4, inicio: 2022,
+    valores: [[26, 30, 24, 42], [28, 38, 27, 44], [34, 36, 33, 52]] };
+
+  let tablas = null;   // última salida, para copiar y descargar
+
+  /* ---------- Configuración y grilla ---------- */
+  function entero(id, min, max, def) {
+    const v = parseInt($(id).value, 10);
+    return Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : def;
+  }
+  function config() {
+    return {
+      anios: entero("anios", 2, 10, 3),
+      L: parseInt($("L").value, 10),
+      inicio: entero("inicio", 1, 9999, 2022),
+      horiz: entero("horiz", 1, 48, parseInt($("L").value, 10)),
+      dec: parseInt($("dec").value, 10),
+      sep: $("sep").value
+    };
+  }
+  function leerGrilla() {
+    return Array.from($("grilla").querySelectorAll("tbody tr")).map(tr =>
+      Array.from(tr.querySelectorAll("input")).map(i => i.value));
+  }
+  function dibujarGrilla(valores) {
+    const { anios, L, inicio } = config();
+    let html = "<thead><tr><th scope=\"col\">Año</th>";
+    for (let j = 0; j < L; j++) html += `<th scope="col">${C.nombrePeriodo(j, L)}</th>`;
+    html += "</tr></thead><tbody>";
+    for (let i = 0; i < anios; i++) {
+      html += `<tr><td>${inicio + i}</td>`;
+      for (let j = 0; j < L; j++) {
+        const v = (valores[i] && valores[i][j] != null) ? String(valores[i][j]) : "";
+        html += `<td><input type="text" inputmode="decimal" autocomplete="off" data-i="${i}" data-j="${j}"
+          aria-label="${inicio + i}, período ${C.nombrePeriodo(j, L)}" value="${v.replace(/"/g, "&quot;")}"></td>`;
+      }
+      html += "</tr>";
+    }
+    $("grilla").innerHTML = html + "</tbody>";
+  }
+  /* Reubica los valores en orden cronológico cuando cambia L. */
+  function reacomodar(valores, L) {
+    const plano = valores.flat().filter(v => String(v).trim() !== "");
+    const filas = [];
+    for (let k = 0; k < plano.length; k += L) filas.push(plano.slice(k, k + L));
+    return filas;
+  }
+  function llenarDesdeLista(lista) {
+    const L = config().L;
+    $("anios").value = Math.min(10, Math.max(2, Math.ceil(lista.length / L)));
+    const filas = [];
+    for (let k = 0; k < lista.length; k += L) filas.push(lista.slice(k, k + L).map(String));
+    dibujarGrilla(filas);
+    guardar();
+  }
+
+  /* ---------- Persistencia ---------- */
+  function guardar() {
+    try {
+      const c = config();
+      localStorage.setItem(CLAVE, JSON.stringify({ ...c, valores: leerGrilla() }));
+    } catch (e) { /* almacenamiento no disponible */ }
+  }
+  function restaurar() {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(CLAVE) || "null"); } catch (e) { d = null; }
+    if (!d || typeof d !== "object") return null;
+    if (d.anios) $("anios").value = d.anios;
+    if ([2, 3, 4, 6, 12].includes(d.L)) $("L").value = String(d.L);
+    if (d.inicio) $("inicio").value = d.inicio;
+    if (d.horiz) $("horiz").value = d.horiz;
+    if ([2, 3, 4].includes(d.dec)) $("dec").value = String(d.dec);
+    if (d.sep === "," || d.sep === ".") $("sep").value = d.sep;
+    return Array.isArray(d.valores) ? d.valores : [];
+  }
+
+  /* ---------- Formato ---------- */
+  function fmt(v, tipo, c) {
+    if (v === null || v === undefined || Number.isNaN(v)) return "";
+    if (tipo === "txt") return String(v);
+    if (tipo === "int") return String(v);
+    let s = Number(v).toFixed(tipo === "ind" ? Math.max(4, c.dec) : c.dec);
+    if (s === "-0" || /^-0[.,]0+$/.test(s)) s = s.slice(1);
+    if (s.includes(".")) s = s.replace(/0+$/, "").replace(/\.$/, "");   // sin ceros finales: 1,2000 → 1,2; 12,00 → 12
+    return c.sep === "," ? s.replace(".", ",") : s;
+  }
+  function tablaHTML(t, c) {
+    let h = "<table><thead><tr>";
+    t.cols.forEach(col => { h += `<th scope="col"${col.tipo === "txt" ? " style=\"text-align:left\"" : ""}>${col.nombre}</th>`; });
+    h += "</tr></thead><tbody>";
+    t.filas.forEach(f => {
+      h += `<tr${f.total ? " class=\"total\"" : ""}>`;
+      f.celdas.forEach((v, k) => {
+        const tipo = t.cols[k].tipo, s = fmt(v, tipo, c);
+        h += `<td class="${tipo === "txt" ? "txt" : "num"}">${s === "" ? "—" : s}</td>`;
+      });
+      h += "</tr>";
+    });
+    return h + "</tbody></table>";
+  }
+  function tablaTexto(t, c, delim) {
+    const esc = s => (delim !== "\t" && (s.includes(delim) || s.includes('"'))) ? `"${s.replace(/"/g, '""')}"` : s;
+    const lineas = [t.cols.map(col => esc(col.nombre)).join(delim)];
+    t.filas.forEach(f => lineas.push(f.celdas.map((v, k) => esc(fmt(v, t.cols[k].tipo, c))).join(delim)));
+    return lineas.join("\r\n");
+  }
+
+  /* ---------- Cálculo ---------- */
+  function mostrarError(texto) { const m = $("msg"); m.textContent = texto; m.classList.add("show"); }
+  function limpiarError() { $("msg").classList.remove("show"); $("msg").textContent = ""; }
+
+  function calcular() {
+    limpiarError();
+    const c = config();
+    const inputs = Array.from($("grilla").querySelectorAll("input"));
+    let vacios = 0, invalidos = 0;
+    const y = [];
+    inputs.forEach(inp => {
+      inp.classList.remove("err");
+      const txt = inp.value.trim();
+      const v = C.parseNumero(txt);
+      if (txt === "") { vacios++; inp.classList.add("err"); }
+      else if (!(Number.isFinite(v) && v > 0)) { invalidos++; inp.classList.add("err"); }
+      y.push(v);
+    });
+    if (vacios || invalidos) {
+      const partes = [];
+      if (vacios) partes.push(vacios === 1 ? "falta 1 valor" : `faltan ${vacios} valores`);
+      if (invalidos) partes.push(invalidos === 1 ? "1 valor no es un número positivo" : `${invalidos} valores no son números positivos`);
+      let txt = partes.join(" y ");
+      txt = txt.charAt(0).toUpperCase() + txt.slice(1);
+      mostrarError(`${txt}. Revisa las celdas marcadas en rojo: el modelo es multiplicativo y necesita valores mayores que cero.`);
+      const primero = inputs.find(i => i.classList.contains("err"));
+      if (primero) primero.focus();
+      return;
+    }
+    if (c.anios < 2) { mostrarError("Se necesitan al menos 2 años de datos."); return; }
+
+    let r;
+    try { r = C.calcular(y, c.L, { horizonte: c.horiz }); }
+    catch (e) { mostrarError(e.message); return; }
+    tablas = armarTablas(r, c);
+    pintar(tablas, r, c);
+    guardar();
+    $("resultados").hidden = false;
+    $("resultados").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function armarTablas(r, c) {
+    const nom = j => C.nombrePeriodo(j, r.L);
+    const anio = j => c.inicio + Math.floor(j / r.L);
+    const cols = [{ nombre: "Año", tipo: "txt" }, { nombre: "t", tipo: "int" }, { nombre: "Ventas", tipo: "num" },
+      { nombre: "Fluctuaciones", tipo: "num" }, { nombre: "P. móvil", tipo: "num" }];
+    if (r.par) cols.push({ nombre: "Móvil centrado", tipo: "num" });
+    cols.push({ nombre: "Índice específico", tipo: "ind" });
+    const filas = r.y.map((v, j) => {
+      const celdas = [anio(j), r.t[j], v, r.total[j], r.pm[j]];
+      if (r.par) celdas.push(r.pmc[j]);
+      celdas.push(r.ieEsp[j]);
+      return { celdas };
+    });
+    const principal = { titulo: "Tabla principal", cols, filas };
+
+    // Cuadro ordenado: índices específicos por año (filas) y período (columnas).
+    const colsInd = [{ nombre: "Año", tipo: "txt" }];
+    for (let s = 0; s < r.L; s++) colsInd.push({ nombre: nom(s), tipo: "ind" });
+    colsInd.push({ nombre: "Suma", tipo: "ind" });
+    const filasInd = [];
+    for (let i = 0; i < r.N / r.L; i++)
+      filasInd.push({ celdas: [c.inicio + i, ...r.ieEsp.slice(i * r.L, (i + 1) * r.L), null] });
+    filasInd.push({ total: true, celdas: ["Índice estacional", ...r.bruto, r.sumaBruto] });
+    filasInd.push({ total: true, celdas: ["Índice corregido", ...r.ajustado, r.sumaAjustado] });
+    const indices = { titulo: "Corrección de los índices", cols: colsInd, filas: filasInd };
+
+    const desest = {
+      titulo: "Desestacionalización",
+      cols: [{ nombre: "Año", tipo: "txt" }, { nombre: "t", tipo: "int" }, { nombre: "Ventas", tipo: "num" },
+        { nombre: "Índice corregido", tipo: "ind" }, { nombre: "Ventas desestacionalizadas", tipo: "num" }],
+      filas: r.y.map((v, j) => ({ celdas: [anio(j), r.t[j], v, r.ajustado[j % r.L], r.desest[j]] }))
+    };
+    const recta = {
+      titulo: "Recta de tendencia",
+      cols: [{ nombre: "Parámetro", tipo: "txt" }, { nombre: "Valor", tipo: "ind" }],
+      filas: [{ celdas: ["a (ordenada)", r.a] }, { celdas: ["b (pendiente)", r.b] }, { celdas: ["R²", r.r2] }]
+    };
+    const pronostico = {
+      titulo: "Pronóstico",
+      cols: [{ nombre: "Año", tipo: "txt" }, { nombre: "Período", tipo: "txt" }, { nombre: "t", tipo: "int" },
+        { nombre: "Tendencia", tipo: "num" }, { nombre: "Índice corregido", tipo: "ind" }, { nombre: "Pronóstico", tipo: "num" }],
+      filas: r.pronostico.map(p => ({ celdas: [c.inicio + p.anio, nom(p.periodo), p.t, p.tendencia, p.indice, p.pronostico] }))
+    };
+    return { principal, indices, desest, recta, pronostico };
+  }
+
+  function factor(r, c) {
+    return `Factor de corrección = ${r.L} / ${fmt(r.sumaBruto, "ind", c)} = ${fmt(r.fc, "ind", c)}`;
+  }
+
+  function ecuacion(r, c) {
+    const a = fmt(r.a, "ind", c), babs = fmt(Math.abs(r.b), "ind", c);
+    const signo = r.b < 0 && Number(babs.replace(",", ".")) !== 0 ? "−" : "+";
+    return `Ŷ = ${a} ${signo} ${babs}·t`;
+  }
+
+  function pintar(T, r, c) {
+    $("tab-principal").innerHTML = tablaHTML(T.principal, c);
+    $("tab-indices").innerHTML = tablaHTML(T.indices, c);
+    $("tab-desest").innerHTML = tablaHTML(T.desest, c);
+    $("factor").textContent = factor(r, c);
+    T.factor = factor(r, c);
+    $("tab-recta").innerHTML = tablaHTML(T.recta, c);
+    $("tab-pronostico").innerHTML = tablaHTML(T.pronostico, c);
+    $("ecuacion").textContent = ecuacion(r, c);
+    $("nota-par").hidden = !r.par;
+    T.ecuacion = ecuacion(r, c);
+  }
+
+  /* ---------- Copiar y descargar ---------- */
+  function toast(texto) {
+    const t = $("toast"); t.textContent = texto; t.classList.add("show");
+    clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("show"), 1600);
+  }
+  async function copiar(texto) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(texto); return true; }
+    } catch (e) { /* se intenta el método alternativo */ }
+    const ta = document.createElement("textarea");
+    ta.value = texto; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+  document.addEventListener("click", async ev => {
+    const b = ev.target.closest("[data-copiar]");
+    if (!b || !tablas) return;
+    const c = config(), t = tablas[b.dataset.copiar];
+    let texto = tablaTexto(t, c, "\t");
+    if (b.dataset.copiar === "recta") texto = tablas.ecuacion + "\r\n" + texto;
+    if (b.dataset.copiar === "indices") texto += "\r\n" + tablas.factor;
+    toast(await copiar(texto) ? "Tabla copiada" : "No se pudo copiar");
+  });
+  $("btn-csv").addEventListener("click", () => {
+    if (!tablas) return;
+    const c = config(), delim = c.sep === "," ? ";" : ",";
+    const bloques = ["principal", "indices", "desest", "recta", "pronostico"].map(k => {
+      let txt = tablas[k].titulo + "\r\n" + tablaTexto(tablas[k], c, delim);
+      if (k === "indices") txt += "\r\n" + tablas.factor;
+      if (k === "recta") txt += "\r\nEcuación" + delim + tablas.ecuacion;
+      return txt;
+    });
+    const blob = new Blob(["﻿" + bloques.join("\r\n\r\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = "serie_promedio_movil.csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  /* ---------- Eventos ---------- */
+  let ultimoL = config().L;
+  $("anios").addEventListener("change", () => {
+    $("anios").value = config().anios; dibujarGrilla(leerGrilla()); guardar();
+  });
+  $("inicio").addEventListener("change", () => { dibujarGrilla(leerGrilla()); guardar(); });
+  $("L").addEventListener("change", () => {
+    const L = config().L;
+    if (parseInt($("horiz").value, 10) === ultimoL) $("horiz").value = L;
+    ultimoL = L;
+    dibujarGrilla(reacomodar(leerGrilla(), L)); guardar();
+  });
+  ["horiz", "dec", "sep"].forEach(id => $(id).addEventListener("change", () => {
+    $("horiz").value = config().horiz;
+    guardar();
+    if (!$("resultados").hidden) calcular();
+  }));
+  $("grilla").addEventListener("input", ev => {
+    if (ev.target.matches("input")) ev.target.classList.remove("err");
+    guardar();
+  });
+  /* Pegar un bloque de Excel directamente sobre una celda. */
+  $("grilla").addEventListener("paste", ev => {
+    const inp = ev.target.closest("input");
+    const texto = (ev.clipboardData || window.clipboardData).getData("text");
+    if (!inp || !/[\t\n;]/.test(texto.trim())) return;
+    ev.preventDefault();
+    const L = config().L, lista = C.parsePegado(texto, L);
+    const inicio = parseInt(inp.dataset.i, 10) * L + parseInt(inp.dataset.j, 10);
+    const plano = leerGrilla().flat();
+    lista.forEach((v, k) => { plano[inicio + k] = String(v); });
+    llenarDesdeLista(plano.map(v => v == null ? "" : v));
+  });
+  $("btn-pegar").addEventListener("click", () => {
+    const lista = C.parsePegado($("pegar").value, config().L);
+    if (!lista.length) { mostrarError("No se encontraron números en el texto pegado."); return; }
+    limpiarError();
+    llenarDesdeLista(lista);
+    $("pegar").value = "";
+    $("pegar-box").open = false;
+    toast(`${lista.length} valores cargados`);
+  });
+  $("btn-calc").addEventListener("click", calcular);
+  $("btn-ej").addEventListener("click", () => {
+    limpiarError();
+    $("anios").value = EJEMPLO.anios; $("L").value = String(EJEMPLO.L); $("inicio").value = EJEMPLO.inicio;
+    $("horiz").value = EJEMPLO.L; ultimoL = EJEMPLO.L;
+    dibujarGrilla(EJEMPLO.valores.map(f => f.map(String)));
+    calcular();
+  });
+  $("btn-limpiar").addEventListener("click", () => {
+    limpiarError();
+    dibujarGrilla([]);
+    $("resultados").hidden = true;
+    tablas = null;
+    guardar();
+    const primero = $("grilla").querySelector("input");
+    if (primero) primero.focus();
+  });
+  $("grilla").addEventListener("keydown", ev => {
+    if (ev.key === "Enter" && ev.target.matches("input")) {
+      ev.preventDefault();
+      const todos = Array.from($("grilla").querySelectorAll("input"));
+      const sig = todos[todos.indexOf(ev.target) + 1];
+      if (sig) sig.focus(); else calcular();
+    }
+  });
+
+  /* ---------- Inicio ---------- */
+  const guardados = restaurar();
+  ultimoL = config().L;
+  dibujarGrilla(guardados || []);
+
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
+})();
+</script>
+</body>
+</html>
