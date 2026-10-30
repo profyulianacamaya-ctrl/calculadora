@@ -448,7 +448,7 @@
     const desest = {
       titulo: "Desestacionalización",
       cols: [{ nombre: "Año", tipo: "txt" }, { nombre: "t", tipo: "int" }, { nombre: "Ventas", tipo: "num" },
-        { nombre: "Índice corregido", tipo: "ind" }, { nombre: "Ventas desestacionalizadas", tipo: "num" }],
+        { nombre: "Índice corregido", tipo: "ind" }, { nombre: "Ventas desestacionalizadas", tipo: "ind" }],
       filas: r.y.map((v, j) => ({ celdas: [anio(j), r.t[j], v, r.ajustado[j % r.L], r.desest[j]] }))
     };
     const recta = {

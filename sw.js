@@ -1,6 +1,6 @@
 /* Service worker: guarda la app para usarla sin conexión.
    Sirve desde la caché y la actualiza en segundo plano. Al publicar cambios, subir VERSION. */
-const VERSION = "serie-pm-v5";
+const VERSION = "serie-pm-v6";
 const ARCHIVOS = ["./", "./index.html", "./calc.js", "./manifest.json", "./icon.svg",
                   "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 
